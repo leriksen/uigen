@@ -1,0 +1,38 @@
+# dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# build
+dist/
+
+# env files
+.env
+.env.local
+.env.*.local
+
+# database
+prisma/dev.db
+prisma/dev.db-journal
+
+# generated
+src/generated/
+
+# logs
+logs.txt
+*.log
+
+# OS
+.DS_Store
+
+# editor
+.vscode/
+.idea/
+
+# Claude Code local files
+.claude/
+
+# Next.js auto-generated
+next-env.d.ts
