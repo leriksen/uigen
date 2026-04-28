@@ -3,9 +3,23 @@ import { render, screen, cleanup } from "@testing-library/react";
 import { MessageList } from "../MessageList";
 import type { Message } from "ai";
 
-// Mock the MarkdownRenderer component
 vi.mock("../MarkdownRenderer", () => ({
   MarkdownRenderer: ({ content }: { content: string }) => <div>{content}</div>,
+}));
+
+vi.mock("../ToolCallBadge", () => ({
+  ToolCallBadge: ({
+    toolName,
+    state,
+  }: {
+    toolName: string;
+    args: Record<string, unknown>;
+    state: string;
+  }) => (
+    <div data-testid="tool-call-badge" data-state={state}>
+      {toolName}
+    </div>
+  ),
 }));
 
 afterEach(() => {
@@ -287,4 +301,162 @@ test("MessageList shows loading for assistant message with empty parts", () => {
     (el) => el.textContent === "Generating..."
   );
   expect(generatingElements).toHaveLength(1);
+});
+
+test("MessageList renders source parts", () => {
+  const messages: Message[] = [
+    {
+      id: "1",
+      role: "assistant",
+      content: "",
+      parts: [
+        {
+          type: "source",
+          source: { url: "https://example.com", title: "Example" },
+        } as unknown as NonNullable<Message["parts"]>[number],
+      ],
+    },
+  ];
+
+  const { container } = render(<MessageList messages={messages} />);
+
+  const sourceEl = container.querySelector(".text-neutral-500");
+  expect(sourceEl?.textContent).toContain("Source:");
+  expect(sourceEl?.textContent).toContain("example.com");
+});
+
+test("MessageList does not render hr for step-start at index 0", () => {
+  const messages: Message[] = [
+    {
+      id: "1",
+      role: "assistant",
+      content: "",
+      parts: [
+        { type: "step-start" },
+        { type: "text", text: "Content after step-start" },
+      ],
+    },
+  ];
+
+  const { container } = render(<MessageList messages={messages} />);
+
+  // step-start at index 0 should not produce an hr
+  expect(container.querySelector("hr")).toBeNull();
+  expect(screen.getByText("Content after step-start")).toBeDefined();
+});
+
+test("MessageList shows loading indicator after parts content when isLoading", () => {
+  const messages: Message[] = [
+    {
+      id: "1",
+      role: "assistant",
+      content: "",
+      parts: [{ type: "text", text: "Partial response so far" }],
+    },
+  ];
+
+  render(<MessageList messages={messages} isLoading={true} />);
+
+  expect(screen.getByText("Partial response so far")).toBeDefined();
+  expect(screen.getByText("Generating...")).toBeDefined();
+});
+
+test("MessageList does not show loading indicator for non-last assistant message with parts", () => {
+  const messages: Message[] = [
+    {
+      id: "1",
+      role: "assistant",
+      content: "",
+      parts: [{ type: "text", text: "First response" }],
+    },
+    {
+      id: "2",
+      role: "user",
+      content: "Follow up",
+    },
+  ];
+
+  render(<MessageList messages={messages} isLoading={true} />);
+
+  expect(screen.queryByText("Generating...")).toBeNull();
+});
+
+test("MessageList renders tool-invocation badge with correct state", () => {
+  const messages: Message[] = [
+    {
+      id: "1",
+      role: "assistant",
+      content: "",
+      parts: [
+        {
+          type: "tool-invocation",
+          toolInvocation: {
+            toolCallId: "tc1",
+            toolName: "str_replace_editor",
+            args: { command: "create", path: "/components/Button.tsx" },
+            state: "call",
+          },
+        },
+      ],
+    },
+  ];
+
+  render(<MessageList messages={messages} />);
+
+  const badge = screen.getByTestId("tool-call-badge");
+  expect(badge).toBeDefined();
+  expect(badge.getAttribute("data-state")).toBe("call");
+  expect(badge.textContent).toBe("str_replace_editor");
+});
+
+test("MessageList renders multiple tool-invocation badges", () => {
+  const messages: Message[] = [
+    {
+      id: "1",
+      role: "assistant",
+      content: "",
+      parts: [
+        {
+          type: "tool-invocation",
+          toolInvocation: {
+            toolCallId: "tc1",
+            toolName: "str_replace_editor",
+            args: {},
+            state: "result",
+            result: "ok",
+          },
+        },
+        {
+          type: "tool-invocation",
+          toolInvocation: {
+            toolCallId: "tc2",
+            toolName: "file_manager",
+            args: {},
+            state: "result",
+            result: "ok",
+          },
+        },
+      ],
+    },
+  ];
+
+  render(<MessageList messages={messages} />);
+
+  const badges = screen.getAllByTestId("tool-call-badge");
+  expect(badges).toHaveLength(2);
+  expect(badges[0].textContent).toBe("str_replace_editor");
+  expect(badges[1].textContent).toBe("file_manager");
+});
+
+test("MessageList uses message content as key when id is absent", () => {
+  const messages = [
+    { role: "user", content: "Hello" },
+    { role: "assistant", content: "Hi there" },
+  ] as Message[];
+
+  // Should render without React key warning / duplicate issues
+  render(<MessageList messages={messages} />);
+
+  expect(screen.getByText("Hello")).toBeDefined();
+  expect(screen.getByText("Hi there")).toBeDefined();
 });
