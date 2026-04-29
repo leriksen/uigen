@@ -22,7 +22,7 @@ interface ToolCallBadgeProps {
 
 function getLabel(toolName: string, args: Record<string, unknown>): string {
   if (toolName === "str_replace_editor") {
-    const { command, path } = args as StrReplaceArgs;
+    const { command, path } = args as unknown as StrReplaceArgs;
     const file = path ? path.split("/").pop() : path;
     switch (command) {
       case "create":
@@ -39,7 +39,7 @@ function getLabel(toolName: string, args: Record<string, unknown>): string {
   }
 
   if (toolName === "file_manager") {
-    const { command, path, new_path } = args as FileManagerArgs;
+    const { command, path, new_path } = args as unknown as FileManagerArgs;
     const file = path ? path.split("/").pop() : path;
     switch (command) {
       case "rename":
