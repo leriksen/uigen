@@ -5,6 +5,8 @@ import {
   useContext,
   ReactNode,
   useEffect,
+  useRef,
+  useCallback,
 } from "react";
 import { useChat as useAIChat } from "@ai-sdk/react";
 import { Message } from "ai";
@@ -33,23 +35,45 @@ export function ChatProvider({
 }: ChatContextProps & { children: ReactNode }) {
   const { fileSystem, handleToolCall } = useFileSystem();
 
+  // Keep refs to current values so we can read them at submit time
+  // without putting them in render-time deps that recreate on every keystroke.
+  const fileSystemRef = useRef(fileSystem);
+  fileSystemRef.current = fileSystem;
+  const projectIdRef = useRef(projectId);
+  projectIdRef.current = projectId;
+
+  const onToolCall = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ({ toolCall }: { toolCall: any }) => {
+      handleToolCall(toolCall);
+    },
+    [handleToolCall]
+  );
+
   const {
     messages,
     input,
     handleInputChange,
-    handleSubmit,
+    handleSubmit: aiHandleSubmit,
     status,
   } = useAIChat({
     api: "/api/chat",
     initialMessages,
-    body: {
-      files: fileSystem.serialize(),
-      projectId,
-    },
-    onToolCall: ({ toolCall }) => {
-      handleToolCall(toolCall);
-    },
+    onToolCall,
   });
+
+  // Serialize the file system only at submit time, not on every render.
+  const handleSubmit = useCallback(
+    (e: React.FormEvent<HTMLFormElement>) => {
+      aiHandleSubmit(e, {
+        body: {
+          files: fileSystemRef.current.serialize(),
+          projectId: projectIdRef.current,
+        },
+      });
+    },
+    [aiHandleSubmit]
+  );
 
   // Track anonymous work
   useEffect(() => {
